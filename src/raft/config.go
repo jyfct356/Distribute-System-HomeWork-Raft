@@ -8,7 +8,7 @@ package raft
 // test with the original before submitting.
 //
 
-import "labrpc"
+import "src/labrpc"
 import "log"
 import "sync"
 import "testing"
@@ -102,13 +102,11 @@ func (cfg *config) crash1(i int) {
 	}
 }
 
-//
 // start or re-start a Raft.
 // if one already exists, "kill" it first.
 // allocate new outgoing port file names, and a new
 // state persister, to isolate previous instance of
 // this server. since we cannot really kill it.
-//
 func (cfg *config) start1(i int) {
 	cfg.crash1(i)
 
@@ -307,8 +305,9 @@ func (cfg *config) checkTerms() int {
 func (cfg *config) checkNoLeader() {
 	for i := 0; i < cfg.n; i++ {
 		if cfg.connected[i] {
-			_, is_leader := cfg.rafts[i].GetState()
+			term, is_leader := cfg.rafts[i].GetState()
 			if is_leader {
+				fmt.Println(time.Now(), "checkNoLeader fatal term: ", term)
 				cfg.t.Fatalf("expected no leader, but %v claims to be leader", i)
 			}
 		}

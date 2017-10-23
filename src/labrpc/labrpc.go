@@ -48,7 +48,9 @@ package labrpc
 //   pass svc to srv.AddService()
 //
 
-import "encoding/gob"
+import (
+	"encoding/gob"
+)
 import "bytes"
 import "reflect"
 import "sync"
@@ -79,6 +81,7 @@ type ClientEnd struct {
 // the return value indicates success; false means the
 // server couldn't be contacted.
 func (e *ClientEnd) Call(svcMeth string, args interface{}, reply interface{}) bool {
+	//fmt.Println("call")
 	req := reqMsg{}
 	req.endname = e.endname
 	req.svcMeth = svcMeth
@@ -89,7 +92,6 @@ func (e *ClientEnd) Call(svcMeth string, args interface{}, reply interface{}) bo
 	qe := gob.NewEncoder(qb)
 	qe.Encode(args)
 	req.args = qb.Bytes()
-
 	e.ch <- req
 
 	rep := <-req.replyCh
@@ -324,11 +326,9 @@ func (rn *Network) GetCount(servername interface{}) int {
 	return svr.GetCount()
 }
 
-//
 // a server is a collection of services, all sharing
 // the same rpc dispatcher. so that e.g. both a Raft
 // and a k/v server can listen to the same rpc endpoint.
-//
 type Server struct {
 	mu       sync.Mutex
 	services map[string]*Service
