@@ -98,7 +98,7 @@ func TestBasicAgree(t *testing.T) {
 		if nd > 0 {
 			t.Fatalf("some have committed before Start()")
 		}
-
+		fmt.Println(time.Now(), " test command ", index*100)
 		xindex := cfg.one(index*100, servers)
 		if xindex != index {
 			t.Fatalf("got index %v but expected %v", xindex, index)
@@ -185,7 +185,7 @@ func TestFailNoAgree(t *testing.T) {
 	if index2 < 2 || index2 > 3 {
 		t.Fatalf("unexpected index %v", index2)
 	}
-
+	//fmt.Println(time.Now(), " last one after repair")
 	cfg.one(1000, servers)
 
 	fmt.Printf("  ... Passed\n")
@@ -316,14 +316,17 @@ func TestRejoin(t *testing.T) {
 	// new leader network failure
 	leader2 := cfg.checkOneLeader()
 	cfg.disconnect(leader2)
+	fmt.Println(time.Now(), " test discon leader2 ", leader2)
 
 	// old leader connected again
 	cfg.connect(leader1)
+	fmt.Println(time.Now(), " test con leader1 ", leader1)
 
 	cfg.one(104, 2)
 
 	// all together now
 	cfg.connect(leader2)
+	fmt.Println(time.Now(), " test con leader2 again", leader2)
 
 	cfg.one(105, servers)
 
@@ -344,6 +347,7 @@ func TestBackup(t *testing.T) {
 	cfg.disconnect((leader1 + 2) % servers)
 	cfg.disconnect((leader1 + 3) % servers)
 	cfg.disconnect((leader1 + 4) % servers)
+	fmt.Println(time.Now(), "=== disconnect 3 followers, leave old leader and 1 follower ===")
 
 	// submit lots of commands that won't commit
 	for i := 0; i < 50; i++ {
@@ -359,6 +363,7 @@ func TestBackup(t *testing.T) {
 	cfg.connect((leader1 + 2) % servers)
 	cfg.connect((leader1 + 3) % servers)
 	cfg.connect((leader1 + 4) % servers)
+	fmt.Println(time.Now(), "=== disconnect rest 2 servers , connect other 3 servers (election a new leader) ===")
 
 	// lots of successful commands to new group.
 	for i := 0; i < 50; i++ {
@@ -372,6 +377,7 @@ func TestBackup(t *testing.T) {
 		other = (leader2 + 1) % servers
 	}
 	cfg.disconnect(other)
+	fmt.Println(time.Now(), "=== leave new leader and 1 follower ===")
 
 	// lots more commands that won't commit
 	for i := 0; i < 50; i++ {
@@ -387,6 +393,7 @@ func TestBackup(t *testing.T) {
 	cfg.connect((leader1 + 0) % servers)
 	cfg.connect((leader1 + 1) % servers)
 	cfg.connect(other)
+	fmt.Println(time.Now(), "=== disconnect 2 servers, leave old leaders ", leader1, " and 2 follower ", (leader1+1)%servers, " ", other, "===")
 
 	// lots of successful commands to new group.
 	for i := 0; i < 50; i++ {
@@ -397,6 +404,7 @@ func TestBackup(t *testing.T) {
 	for i := 0; i < servers; i++ {
 		cfg.connect(i)
 	}
+	fmt.Println(time.Now(), "=== all ===")
 	cfg.one(rand.Int(), servers)
 
 	fmt.Printf("  ... Passed\n")

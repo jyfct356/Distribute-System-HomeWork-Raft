@@ -156,6 +156,7 @@ func (cfg *config) start1(i int) {
 				}
 				_, prevok := cfg.logs[i][m.Index-1]
 				cfg.logs[i][m.Index] = v
+				fmt.Println(time.Now(), " raft ", i, " commit index ", m.Index, " command ", v)
 				cfg.mu.Unlock()
 
 				if m.Index > 1 && prevok == false {
@@ -394,9 +395,13 @@ func (cfg *config) one(cmd int, expectedServers int) int {
 			cfg.mu.Unlock()
 			if rf != nil {
 				index1, _, ok := rf.Start(cmd)
+				//fmt.Println(time.Now(), " send command ", cmd, " to server ", starts)
 				if ok {
+					//fmt.Println(time.Now(), "send to leader")
 					index = index1
 					break
+				} else {
+					//fmt.Println(time.Now(), "not to leader")
 				}
 			}
 		}
@@ -409,6 +414,7 @@ func (cfg *config) one(cmd int, expectedServers int) int {
 				nd, cmd1 := cfg.nCommitted(index)
 				if nd > 0 && nd >= expectedServers {
 					// committed
+					fmt.Println(time.Now(), " check command ", cmd1.(int), " expected ", cmd, " committed by ", nd, " servers index ", index)
 					if cmd2, ok := cmd1.(int); ok && cmd2 == cmd {
 						// and it was the command we submitted.
 						return index
