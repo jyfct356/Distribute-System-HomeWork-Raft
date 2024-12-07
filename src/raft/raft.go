@@ -340,6 +340,7 @@ func (rf *Raft) tryRequestVote(server int) {
 			return
 		}
 
+		// 以下是Args字段填充、发送、等待回复
 		lastLogIndex := 0
 		lastLogTerm := -1
 		if len(rf.log)-1 >= 0 {
@@ -482,6 +483,7 @@ func (rf *Raft) tryHeartbeat(server int) {
 				}
 			}
 		}
+		// 以下是Entry内容填充、发送、并等待回复
 		prevLogIndex := 0
 		prevLogTerm := -1
 		if rf.nextIndex[server]-2 >= 0 {
