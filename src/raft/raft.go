@@ -18,7 +18,9 @@ package raft
 //
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/gob"
+	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -95,6 +97,20 @@ func (rf *Raft) persist() {
 	// e.Encode(rf.yyy)
 	// data := w.Bytes()
 	// rf.persister.SaveRaftState(data)
+
+	w := new(bytes.Buffer)
+	e := gob.NewEncoder(w)
+	if err := e.Encode(rf.currentTerm); err != nil {
+		log.Fatalln("error happen while encoding rf.currentTerm: ", err.Error())
+	}
+	if err := e.Encode(rf.votedFor); err != nil {
+		log.Fatalln("error happen while encoding rf.votedFor: ", err.Error())
+	}
+	if err := e.Encode(rf.log); err != nil {
+		log.Fatalln("error happen while encoding rf.log: ", err.Error())
+	}
+	data := w.Bytes()
+	rf.persister.SaveRaftState(data)
 }
 
 // restore previously persisted state.
@@ -105,6 +121,21 @@ func (rf *Raft) readPersist(data []byte) {
 	// d := gob.NewDecoder(r)
 	// d.Decode(&rf.xxx)
 	// d.Decode(&rf.yyy)
+	if data == nil || len(data) == 0 {
+		return
+	}
+	r := bytes.NewBuffer(data)
+	d := gob.NewDecoder(r)
+	if err := d.Decode(&rf.currentTerm); err != nil {
+		log.Fatalln("error happen while decoding rf.currentTerm: ", err.Error())
+	}
+	if err := d.Decode(&rf.votedFor); err != nil {
+		log.Fatalln("error happen while decoding rf.votedFor: ", err.Error())
+	}
+	if err := d.Decode(&rf.log); err != nil {
+		log.Fatalln("error happen while decoding rf.log: ", err.Error())
+	}
+
 }
 
 type AppendEntriesArgs struct {
@@ -132,13 +163,14 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 	}
 	// 如果是candidate或者旧term的leader，转变为follower
 	if rf.state != 1 {
-		fmt.Println(time.Now(), "another leader ", args.LeaderId, " is exist...return to follower ", rf.me, " state ", rf.state)
+		//fmt.Println(time.Now(), "another leader ", args.LeaderId, " is exist...return to follower ", rf.me, " state ", rf.state)
 		rf.transToFollower()
 	}
 
 	rf.mu.Lock()
 	rf.currentTerm = args.Term
 	rf.lastHeartbeat = time.Now()
+	rf.persist()
 	rf.mu.Unlock()
 	//fmt.Println(time.Now(), " follower ", rf.me, " get heartbeat/append ", args)
 	// 如果没有前置的entry，证明和新leader的log完全对不上
@@ -173,6 +205,7 @@ func (rf *Raft) AppendEntries(args AppendEntriesArgs, reply *AppendEntriesReply)
 			//fmt.Println(time.Now(), " follower ", rf.me, " append ", i, " len of log ", len(rf.log))
 		}
 	}
+	rf.persist()
 	rf.mu.Unlock()
 
 	//fmt.Println(time.Now(), " follower ", rf.me, " get heartbeat from leader ", args.LeaderId, " leadercommit ", args.LeaderCommit)
@@ -211,6 +244,7 @@ type RequestVoteReply struct {
 	VoteGranted bool
 }
 
+// 判断对方的log是否跟得上自己的
 func (rf *Raft) isLogUpToDate(lastLogTerm int, lastLogIndex int) bool {
 	index := 0
 	term := -1
@@ -238,6 +272,7 @@ func (rf *Raft) RequestVote(args RequestVoteArgs, reply *RequestVoteReply) {
 		reply.VoteGranted = true
 		rf.mu.Lock()
 		rf.votedFor = args.CandidateId
+		rf.persist()
 		rf.mu.Unlock()
 		//fmt.Println(time.Now(), rf.me, " term ", rf.currentTerm, "vote ", reply.VoteGranted, " to ", args.CandidateId, args.Term)
 	} else {
@@ -393,6 +428,7 @@ func (rf *Raft) transToFollower() {
 	rf.voteCount = 0
 	rf.votedFor = -1
 	rf.electionTimeout = getRandMillsDuration(100, 500)
+	rf.persist()
 	//fmt.Println(time.Now(), "trans to follower", rf.me, rf.currentTerm)
 }
 
@@ -406,6 +442,7 @@ func (rf *Raft) transToCandidate() {
 	rf.votedFor = -1
 	rf.electionTimeout = getRandMillsDuration(100, 500)
 	rf.electionBegin = time.Now()
+	rf.persist()
 	//fmt.Println(time.Now(), "trans to candidate ", rf.me, rf.currentTerm)
 }
 
@@ -433,7 +470,7 @@ func (rf *Raft) tryHeartbeat(server int) {
 				//fmt.Println(time.Now(), " leader ", rf.me, " append false ", args)
 				// rejoin之后term低于原来的follower，说明已经有新的leader term了，退化为follower
 				if reply.Term > rf.currentTerm {
-					fmt.Println(time.Now(), " leader ", rf.me, " turn to follower because there is newer follower ")
+					//fmt.Println(time.Now(), " leader ", rf.me, " turn to follower because there is newer follower ")
 					rf.transToFollower()
 					break
 				}
@@ -509,7 +546,7 @@ func (rf *Raft) transToLeader() {
 	}
 
 	go rf.heartbeat()
-	fmt.Println(time.Now(), "trans to leader ", rf.me, rf.currentTerm)
+	//fmt.Println(time.Now(), "trans to leader ", rf.me, rf.currentTerm)
 
 }
 
@@ -596,8 +633,9 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	rf.log = append(rf.log, entry)
 	rf.nextIndex[rf.me]++
 	rf.matchIndex[rf.me] = rf.nextIndex[rf.me] - 1
+	rf.persist()
 	rf.mu.Unlock()
-	fmt.Println(time.Now(), " leader ", rf.me, " start command ", command, " index ", index)
+	//fmt.Println(time.Now(), " leader ", rf.me, " start command ", command, " index ", index)
 	// start agreement
 	go rf.tryAgreement(entry)
 
